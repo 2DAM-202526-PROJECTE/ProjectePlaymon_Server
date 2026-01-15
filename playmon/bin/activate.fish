@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/arnaulisto/Code/Projecte-Playmon/server-flask/playmon
+set -gx VIRTUAL_ENV /home/arnaulisto/Code/Playmon/ProjectePlaymon_Server/playmon
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH

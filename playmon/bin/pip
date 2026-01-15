@@ -1,4 +1,4 @@
-#!/home/arnaulisto/Code/Projecte-Playmon/server-flask/playmon/bin/python3
+#!/home/arnaulisto/Code/Playmon/ProjectePlaymon_Server/playmon/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys
