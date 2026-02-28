@@ -1,6 +1,6 @@
 from flask import jsonify, Blueprint, request
 import os
-from vercel_blob import put
+import requests
 from db import fetch_one
 
 user_avatar_bp = Blueprint("user_avatar", __name__)
@@ -44,7 +44,7 @@ def upload_avatar(user_id):
     if len(file_bytes) > MAX_FILE_SIZE:
         return jsonify({"error": f"Fitxer massa gran (màxim {MAX_FILE_SIZE / 1024 / 1024}MB)"}), 400
     
-    # Upload to Vercel Blob
+    # Upload to Vercel Blob via REST API
     try:
         if not BLOB_READ_WRITE_TOKEN:
             return jsonify({"error": "Vercel Blob no configurat al servidor"}), 500
@@ -53,17 +53,30 @@ def upload_avatar(user_id):
         file_ext = file.filename.rsplit(".", 1)[1].lower() if "." in file.filename else "jpg"
         blob_filename = f"avatars/user_{user_id}.{file_ext}"
         
-        # Upload to Vercel Blob
-        blob_response = put(
-            pathname=blob_filename,
-            body=file_bytes,
-            options={
-                "access": "public",
-                "token": BLOB_READ_WRITE_TOKEN
-            }
+        # Upload using Vercel Blob REST API
+        upload_url = f"https://blob.vercel-storage.com/{blob_filename}"
+        headers = {
+            "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
+            "x-add-random-suffix": "0"  # Don't add random suffix to filename
+        }
+        
+        response = requests.put(
+            upload_url,
+            headers=headers,
+            data=file_bytes,
+            params={"filename": blob_filename},
+            timeout=30
         )
         
-        blob_url = blob_response.get("url", "")
+        if response.status_code not in [200, 201]:
+            return jsonify({"error": f"Error pujant a Vercel Blob: HTTP {response.status_code}"}), 500
+        
+        # Parse response to get public URL
+        try:
+            response_data = response.json()
+            blob_url = response_data.get("url", "")
+        except:
+            blob_url = ""
         
         if not blob_url:
             return jsonify({"error": "No s'ha rebut URL de Vercel Blob"}), 500
