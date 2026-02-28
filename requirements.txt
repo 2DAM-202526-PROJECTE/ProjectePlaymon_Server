@@ -21,8 +21,8 @@ pefile==2024.8.26
 pillow==12.1.0
 psycopg==3.2.10
 psycopg-binary==3.2.10
-psycopg-pool==3.3.0PyJWT==2.11.0
-requests==2.31.0Pygments==2.19.2
+psycopg-pool==3.3.0
+Pygments==2.19.2
 pyinstaller==6.17.0
 pyinstaller-hooks-contrib==2025.11
 PyJWT==2.11.0
@@ -37,7 +37,4 @@ typing_extensions==4.15.0
 tzdata==2025.3
 urllib3==2.6.3
 vite==1.5.2
-PyJWT==2.11.0
-python-dotenv==1.0.1
-typing_extensions==4.15.0
 Werkzeug==3.1.5
