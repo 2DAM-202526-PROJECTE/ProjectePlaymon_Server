@@ -13,7 +13,6 @@ from api.Controllers.User.UserLogin import user_login_bp
 from api.Controllers.User.UserAvatar import user_avatar_bp
 from api.Controllers.Video.VideoUpload import video_upload_bp
 from api.Controllers.Global.TableCount import table_count_bp
-from api.Controllers.Global.TableCount import table_count_bp
 
 
 

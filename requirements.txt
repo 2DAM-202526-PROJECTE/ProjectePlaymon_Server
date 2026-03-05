@@ -28,6 +28,7 @@ pyinstaller-hooks-contrib==2025.11
 PyJWT==2.11.0
 pystray==0.19.5
 python-dotenv==1.0.1
+python-xlib==0.33
 pywin32-ctypes==0.2.3
 requests==2.31.0
 setuptools==80.9.0
