@@ -1,5 +1,5 @@
 USER_SELECT = """
-    id, username, name, email, role, is_active, created_at, updated_at, avatar, subscription_plan
+    id, username, name, email, role, is_active, created_at, updated_at, avatar, pla_pagament
 """
 def row_to_user(r):
     return {
@@ -12,7 +12,5 @@ def row_to_user(r):
         "created_at": r[6].isoformat() if r[6] else None,
         "updated_at": r[7].isoformat() if r[7] else None,
         "avatar": r[8],
-        # Backward compatible default for environments where the column
-        # still does not exist in the database schema.
-        "subscription_plan": r[9] if len(r) > 9 else "basic",
+        "pla_pagament": r[9],
     }

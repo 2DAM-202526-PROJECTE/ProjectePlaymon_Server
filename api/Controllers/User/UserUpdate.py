@@ -67,11 +67,11 @@ def update_user(user_id):
         fields.append("password_hash = %s")
         params.append(generate_password_hash(password))
 
-    if "subscription_plan" in data:
-        plan = (data.get("subscription_plan") or "basic").strip().lower()
+    if "pla_pagament" in data:
+        plan = (data.get("pla_pagament") or "basic").strip().lower()
         if plan not in ("basic", "super", "master"):
             return jsonify({"error": "Pla de subscripció invàlid (basic/super/master)"}), 400
-        fields.append("subscription_plan = %s")
+        fields.append("pla_pagament = %s")
         params.append(plan)
 
     if not fields:
