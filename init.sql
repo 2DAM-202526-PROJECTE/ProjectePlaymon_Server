@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   avatar       TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  subscription_plan TEXT NOT NULL DEFAULT 'basic' CHECK (subscription_plan IN ('basic', 'super', 'master'))
+  pla_pagament TEXT NOT NULL DEFAULT 'basic' CHECK (pla_pagament IN ('basic', 'super', 'master'))
 );
 
 CREATE OR REPLACE FUNCTION set_updated_at()
