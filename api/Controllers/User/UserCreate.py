@@ -1,8 +1,8 @@
 from flask import jsonify, Blueprint, request
 from werkzeug.security import generate_password_hash
-from db import fetch_one
-from api.Controllers.User.user_helpers import USER_SELECT, row_to_user
-import psycopg
+from api.Models.Base import SessionLocal
+from api.Services.UserService import UserService
+import sqlalchemy.exc
 
 user_create_bp = Blueprint("user_create", __name__)
 
@@ -34,6 +34,7 @@ def create_user():
     # Per proves: acceptem "password" i la guardem hashejada
     password = (data.get("password") or "password").strip()
     password_hash = generate_password_hash(password)
+    pla_pagament = (data.get("pla_pagament") or "basic").strip()
 
     if not username:
         return jsonify({"error": "Falta 'username'"}), 400
@@ -44,18 +45,25 @@ def create_user():
     if role not in ("admin", "support", "user"):
         return jsonify({"error": "role invàlid (admin/support/user)"}), 400
 
+    db = SessionLocal()
     try:
-        row = fetch_one(
-            f"""
-            INSERT INTO users (username, name, email, role, is_active, password_hash)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING {USER_SELECT};
-            """,
-            (username, name, email, role, is_active, password_hash)
-        )
-        return jsonify(row_to_user(row)), 201
+        user_data = {
+            "username": username,
+            "name": name,
+            "email": email,
+            "role": role,
+            "is_active": is_active,
+            "password_hash": password_hash,
+            "pla_pagament": pla_pagament
+        }
+        user = UserService.create(db, user_data)
+        return jsonify(user.to_dict()), 201
 
-    except psycopg.errors.UniqueViolation:
+    except sqlalchemy.exc.IntegrityError:
+        db.rollback()
         return jsonify({"error": "username o email ja existeix"}), 409
-    except psycopg.Error as e:
+    except Exception as e:
+        db.rollback()
         return jsonify({"error": "Error BD", "detail": str(e)}), 500
+    finally:
+        db.close()

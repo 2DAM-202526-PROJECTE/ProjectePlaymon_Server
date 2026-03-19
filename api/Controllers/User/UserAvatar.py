@@ -4,7 +4,8 @@ import re
 import requests
 from uuid import uuid4
 from urllib.parse import urlparse
-from db import fetch_one
+from api.Models.Base import SessionLocal
+from api.Services.UserService import UserService
 
 user_avatar_bp = Blueprint("user_avatar", __name__)
 
@@ -41,49 +42,39 @@ def delete_blob_by_url(blob_url):
 @user_avatar_bp.post("/api/users/<int:user_id>/avatar")
 def upload_avatar(user_id):
     """
-    Upload avatar image to Vercel Blob and save URL to user record.
-    
-    Expects multipart form with 'file' field.
-    Returns: { "avatar_url": "https://..." }
+    Upload avatar image to Vercel Blob and save URL to user record using SQLAlchemy.
     """
-    
-    # Check if user exists
-    user_row = fetch_one("SELECT id, avatar, username FROM users WHERE id = %s", (user_id,))
-    if not user_row:
-        return jsonify({"error": "Usuari no trobat"}), 404
-
-    old_avatar_url = user_row[1]
-    username = user_row[2] or f"user{user_id}"
-    # Sanitize username for URL (keep only alphanumeric, dash, underscore)
-    safe_username = re.sub(r'[^a-zA-Z0-9_-]', '', username) or f"user{user_id}"
-    
-    # Validate file
-    if "file" not in request.files:
-        return jsonify({"error": "Falta el camp 'file'"}), 400
-    
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "Cap fitxer seleccionat"}), 400
-    
-    if not allowed_file(file.filename):
-        return jsonify({"error": "Format de fitxer no permés (JPEG/PNG/WEBP/GIF)"}), 400
-    
-    # Check file size
-    file_bytes = file.read()
-    if len(file_bytes) > MAX_FILE_SIZE:
-        return jsonify({"error": f"Fitxer massa gran (màxim {MAX_FILE_SIZE / 1024 / 1024}MB)"}), 400
-    
-    # Upload to Vercel Blob via REST API
+    db = SessionLocal()
     try:
+        user = UserService.get_by_id(db, user_id)
+        if not user:
+            return jsonify({"error": "Usuari no trobat"}), 404
+
+        old_avatar_url = user.avatar
+        username = user.username or f"user{user_id}"
+        safe_username = re.sub(r'[^a-zA-Z0-9_-]', '', username) or f"user{user_id}"
+        
+        if "file" not in request.files:
+            return jsonify({"error": "Falta el camp 'file'"}), 400
+        
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "Cap fitxer seleccionat"}), 400
+        
+        if not allowed_file(file.filename):
+            return jsonify({"error": "Format de fitxer no permés (JPEG/PNG/WEBP/GIF)"}), 400
+        
+        file_bytes = file.read()
+        if len(file_bytes) > MAX_FILE_SIZE:
+            return jsonify({"error": f"Fitxer massa gran (màxim {MAX_FILE_SIZE / 1024 / 1024}MB)"}), 400
+        
         if not BLOB_READ_WRITE_TOKEN:
             return jsonify({"error": "Vercel Blob no configurat al servidor"}), 500
         
-        # Generate unique filename per upload to avoid cache/overwrite issues
         original_filename = file.filename or ""
         file_ext = original_filename.rsplit(".", 1)[1].lower() if "." in original_filename else "jpg"
         blob_filename = f"avatars/{safe_username}_{uuid4().hex[:8]}.{file_ext}"
         
-        # Upload using Vercel Blob REST API
         upload_url = f"https://blob.vercel-storage.com/{blob_filename}"
         headers = {
             "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
@@ -102,7 +93,6 @@ def upload_avatar(user_id):
         if response.status_code not in [200, 201]:
             return jsonify({"error": f"Error pujant a Vercel Blob: HTTP {response.status_code}"}), 500
         
-        # Parse response to get public URL
         try:
             response_data = response.json()
             blob_url = response_data.get("url", "")
@@ -112,14 +102,8 @@ def upload_avatar(user_id):
         if not blob_url:
             return jsonify({"error": "No s'ha rebut URL de Vercel Blob"}), 500
         
-        # Save blob URL to database
-        try:
-            fetch_one(
-                "UPDATE users SET avatar = %s WHERE id = %s RETURNING id",
-                (blob_url, user_id)
-            )
-        except Exception as e:
-            return jsonify({"error": f"Error guardant a la BD: {str(e)}"}), 500
+        # Save blob URL via SQlAlchemy Service
+        UserService.update(db, user_id, {"avatar": blob_url})
 
         if old_avatar_url and old_avatar_url != blob_url:
             delete_blob_by_url(old_avatar_url)
@@ -131,29 +115,28 @@ def upload_avatar(user_id):
     
     except Exception as e:
         return jsonify({"error": f"Error pujant fitxer: {str(e)}"}), 500
+    finally:
+        db.close()
 
 
 @user_avatar_bp.delete("/api/users/<int:user_id>/avatar")
 def delete_avatar(user_id):
     """
-    Remove user avatar URL from DB and try deleting blob from Vercel Blob.
-    Returns: { "message": "...", "blob_deleted": true/false }
+    Remove user avatar URL from DB using SQLAlchemy.
     """
+    db = SessionLocal()
     try:
-        user_row = fetch_one("SELECT id, avatar FROM users WHERE id = %s", (user_id,))
-        if not user_row:
+        user = UserService.get_by_id(db, user_id)
+        if not user:
             return jsonify({"error": "Usuari no trobat"}), 404
 
-        current_avatar_url = user_row[1]
+        current_avatar_url = user.avatar
         blob_deleted = False
 
         if current_avatar_url:
             blob_deleted = delete_blob_by_url(current_avatar_url)
 
-        fetch_one(
-            "UPDATE users SET avatar = NULL WHERE id = %s RETURNING id",
-            (user_id,)
-        )
+        UserService.update(db, user_id, {"avatar": None})
 
         return jsonify({
             "message": "Avatar eliminat correctament",
@@ -161,3 +144,5 @@ def delete_avatar(user_id):
         }), 200
     except Exception as e:
         return jsonify({"error": f"Error eliminant avatar: {str(e)}"}), 500
+    finally:
+        db.close()

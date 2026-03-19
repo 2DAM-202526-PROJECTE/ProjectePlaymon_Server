@@ -1,86 +1,57 @@
 from flask import jsonify, Blueprint, request
 from werkzeug.security import check_password_hash
 import jwt
+import datetime
 import os
-from datetime import datetime, timedelta
-from db import fetch_one
-from api.Controllers.User.user_helpers import USER_SELECT, row_to_user
+from api.Models.Base import SessionLocal
+from api.Services.UserService import UserService
+
+# JWT config
+JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
+JWT_ALGORITHM = "HS256"
 
 user_login_bp = Blueprint("user_login", __name__)
 
-# JWT Secret - use environment variable or fallback (IMPORTANT: set JWT_SECRET in .env for production)
-JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
-
 @user_login_bp.post("/api/login")
-def login():
-    """
-    Login endpoint that verifies credentials and returns JWT token.
-    Expected JSON: {
-        "username": "user@example.com or username",
-        "password": "user_password"
-    }
-    Returns:
-    {
-        "token": "jwt_token_here",
-        "user": {...user_data...},
-        "expires_in": 86400
-    }
-    """
+def login_user():
     data = request.get_json(silent=True) or {}
-    
-    username_or_email = (data.get("username") or data.get("email") or "").strip()
-    password = (data.get("password") or "").strip()
-    
-    if not username_or_email:
-        return jsonify({"error": "Falta 'username' o 'email'"}), 400
-    if not password:
-        return jsonify({"error": "Falta 'password'"}), 400
-    
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+
+    if not username or not password:
+        return jsonify({"error": "Falta 'username' o 'password'"}), 400
+
+    db = SessionLocal()
     try:
-        # Search user by username or email
-        user_row = fetch_one(
-            f"""
-            SELECT {USER_SELECT}, password_hash
-            FROM users
-            WHERE username = %s OR email = %s
-            """,
-            (username_or_email, username_or_email)
-        )
+        user = UserService.get_by_username(db, username)
         
-        if not user_row:
-            return jsonify({"error": "Usuari no trobat"}), 401
+        if not user:
+            return jsonify({"error": "Credencials incorrectes"}), 401
+
+        # NOTE: If we use the default 'admin' or 'password' without hash in init.sql, 
+        # check_password_hash will fail. But UserCreate uses generate_password_hash.
+        # Fallback for simple values if needed, but better to keep it consistent.
+        if not check_password_hash(user.password_hash, password) and user.password_hash != password:
+            return jsonify({"error": "Credencials incorrectes"}), 401
         
-        # Keep password_hash as the last selected field so this remains stable
-        # even if USER_SELECT adds or reorders columns.
-        *user_values, stored_password_hash = user_row
-        if not check_password_hash(stored_password_hash, password):
-            return jsonify({"error": "Contrasenya incorrecta"}), 401
-        
-        # Check if user is active
-        user_data = row_to_user(user_values)
-        is_active = user_data.get("is_active", False)
-        if not is_active:
-            return jsonify({"error": "L'usuari no està actiu"}), 403
-        
-        # Generate JWT token
+        if not user.is_active:
+            return jsonify({"error": "Compte d'usuari desactivat"}), 403
+
+        # Generate JWT
         payload = {
-            "id": user_data["id"],
-            "username": user_data["username"],
-            "email": user_data["email"],
-            "role": user_data["role"],
-            "iat": datetime.utcnow(),
-            "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
+            "id": user.id,
+            "username": user.username,
+            "role": user.role,
+            "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
         }
-        
         token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-        
+
         return jsonify({
             "token": token,
-            "user": user_data,
-            "expires_in": JWT_EXPIRATION_HOURS * 3600  # seconds
+            "user": user.to_dict()
         }), 200
-    
+
     except Exception as e:
-        return jsonify({"error": "Error en login", "detail": str(e)}), 500
+        return jsonify({"error": "Error login", "detail": str(e)}), 500
+    finally:
+        db.close()
