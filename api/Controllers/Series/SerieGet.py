@@ -28,3 +28,32 @@ def get_serie(serie_id):
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
+
+@serie_get_bp.get("/api/series/search")
+def search_local_series():
+    from flask import request
+    query = request.args.get("query", "")
+    db = SessionLocal()
+    try:
+        from api.Models.Serie import Serie
+        import unicodedata
+        from sqlalchemy import func
+        if not query:
+            return jsonify([])
+            
+        # Normalitzem accents
+        nfkd = unicodedata.normalize('NFKD', query)
+        query_unaccent = "".join([c for c in nfkd if not unicodedata.combining(c)]).lower()
+        
+        accents = 'áéíóúàèìòùäëïöüâêîôûñÁÉÍÓÚÀÈÌÒÙÄËÏÖÜÂÊÎÔÛÑ'
+        base    = 'aeiouaeiouaeiouaeiounAEIOUAEIOUAEIOUAEIOUN'
+        
+        series = db.query(Serie).filter(
+            Serie.is_public == True,
+            func.translate(Serie.title, accents, base).ilike(f"{query_unaccent}%")
+        ).order_by(Serie.title.asc()).limit(20).all()
+        return jsonify([s.to_dict() for s in series])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
