@@ -13,13 +13,15 @@ def create_payment_intent():
         data = request.json
         print(f"[DEBUG] Rebut pagament: {data}")
         amount = data.get('amount')
+        if amount is None or float(amount) <= 0:
+            return jsonify(error="L'import ha de ser superior a 0 per a processar un pagament amb Stripe"), 400
+
         currency = data.get('currency', 'eur')
         plan_id = data.get('planId')
 
         # Crea un PaymentIntent amb l'import i la moneda
-        # En una app real, aquí hauries de validar el preu al backend segons el plan_id
         intent = stripe.PaymentIntent.create(
-            amount=int(float(amount) * 100), # Stripe usa cèntims
+            amount=int(round(float(amount) * 100)), # Stripe usa cèntims. Round per evitar problemes decimals.
             currency=currency,
             automatic_payment_methods={
                 'enabled': True,
