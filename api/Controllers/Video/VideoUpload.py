@@ -128,7 +128,7 @@ def upload_video():
         db.close()
 
 
-@video_upload_bp.put("/api/videos/<int:video_id>")
+@video_upload_bp.route("/api/videos/<int:video_id>", methods=["PUT"])
 def update_video(video_id):
     db = SessionLocal()
     try:
