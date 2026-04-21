@@ -29,6 +29,45 @@ def get_serie(serie_id):
     finally:
         db.close()
 
+@serie_get_bp.get("/api/series/<int:serie_id>/relacionats")
+def get_series_relacionats(serie_id):
+    """Retorna fins a 12 sèries del mateix gènere, excloent la sèrie actual."""
+    db = SessionLocal()
+    try:
+        from api.Models.Serie import Serie
+        from sqlalchemy import cast, String
+        serie = db.query(Serie).filter(Serie.id == serie_id).first()
+        if not serie:
+            return jsonify([])
+
+        cats = serie.categoria or []
+        if isinstance(cats, str):
+            import json
+            try: cats = json.loads(cats)
+            except: cats = []
+
+        if not cats:
+            series = db.query(Serie).filter(
+                Serie.id != serie_id,
+                Serie.is_public == True
+            ).order_by(Serie.id.desc()).limit(12).all()
+            return jsonify([s.to_dict() for s in series])
+
+        first_genre = cats[0]
+        search_term = str(first_genre.get("id", "")) if isinstance(first_genre, dict) else str(first_genre)
+
+        series = db.query(Serie).filter(
+            Serie.id != serie_id,
+            Serie.is_public == True,
+            cast(Serie.categoria, String).contains(search_term)
+        ).order_by(Serie.id.desc()).limit(12).all()
+
+        return jsonify([s.to_dict() for s in series])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
 @serie_get_bp.get("/api/series/search")
 def search_local_series():
     from flask import request
