@@ -25,51 +25,19 @@ from api.Controllers.Series.SerieCreate import serie_create_bp
 from api.Controllers.Series.SerieUpdate import serie_update_bp
 from api.Controllers.Series.SerieDelete import serie_delete_bp
 
-
+from api.Events.sse import sse_bp
 
 from sqlalchemy import text
 from api.Models.Base import engine, Base
-# Importar els models per a que SQLAlchemy els conegui al fer create_all
 from api.Models.User import User
 from api.Models.Peli import Peli
 from api.Models.Serie import Serie
 from api.Models.Video import Video
 
-# Crear taules si no existeixen
 Base.metadata.create_all(bind=engine)
 
 app = Flask(__name__)
 CORS(app)
-
-@app.get("/api/_debug/migrate")
-def migrate_db():
-    # Attempt to align 'pelicules' table with the new user schema
-    sql = """
-    CREATE SCHEMA IF NOT EXISTS "neon_auth";
-    
-    ALTER TABLE pelicules RENAME COLUMN IF EXISTS backdrop_path TO backdrop_url;
-    ALTER TABLE pelicules RENAME COLUMN IF EXISTS genres TO categoria;
-    ALTER TABLE pelicules RENAME COLUMN IF EXISTS cast_list TO reparto;
-    ALTER TABLE pelicules RENAME COLUMN IF EXISTS crew_list TO direccio;
-    
-    ALTER TABLE pelicules ADD COLUMN IF NOT EXISTS user_id INTEGER;
-    ALTER TABLE pelicules ADD COLUMN IF NOT EXISTS file_size INTEGER;
-    ALTER TABLE pelicules ADD COLUMN IF NOT EXISTS is_public BOOLEAN;
-    
-    -- Sync 'videos' table too
-    ALTER TABLE videos ADD COLUMN IF NOT EXISTS categoria TEXT;
-    ALTER TABLE videos ADD COLUMN IF NOT EXISTS reparto TEXT;
-    ALTER TABLE videos ADD COLUMN IF NOT EXISTS direccio TEXT;
-    ALTER TABLE videos ADD COLUMN IF NOT EXISTS calificacio INTEGER;
-    ALTER TABLE videos ADD COLUMN IF NOT EXISTS fecha_estreno DATE;
-    """
-    try:
-        with engine.connect() as conn:
-            conn.execute(text(sql))
-            conn.commit()
-        return jsonify({"ok": True, "message": "Migration to new schema successful"}), 200
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
 
 app.register_blueprint(user_get_bp)
 app.register_blueprint(user_create_bp)
@@ -91,6 +59,42 @@ app.register_blueprint(serie_create_bp)
 app.register_blueprint(serie_update_bp)
 app.register_blueprint(serie_delete_bp)
 
+app.register_blueprint(sse_bp)
+
+
+@app.get("/")
+def root():
+    return "API OK (Postgres en marxa)"
+
+
+@app.get("/api/_debug/migrate")
+def migrate_db():
+    sql = """
+    CREATE SCHEMA IF NOT EXISTS "neon_auth";
+
+    ALTER TABLE pelicules RENAME COLUMN IF EXISTS backdrop_path TO backdrop_url;
+    ALTER TABLE pelicules RENAME COLUMN IF EXISTS genres TO categoria;
+    ALTER TABLE pelicules RENAME COLUMN IF EXISTS cast_list TO reparto;
+    ALTER TABLE pelicules RENAME COLUMN IF EXISTS crew_list TO direccio;
+
+    ALTER TABLE pelicules ADD COLUMN IF NOT EXISTS user_id INTEGER;
+    ALTER TABLE pelicules ADD COLUMN IF NOT EXISTS file_size INTEGER;
+    ALTER TABLE pelicules ADD COLUMN IF NOT EXISTS is_public BOOLEAN;
+
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS categoria TEXT;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS reparto TEXT;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS direccio TEXT;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS calificacio INTEGER;
+    ALTER TABLE videos ADD COLUMN IF NOT EXISTS fecha_estreno DATE;
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(sql))
+            conn.commit()
+        return jsonify({"ok": True, "message": "Migration to new schema successful"}), 200
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 
 @app.get("/api/_debug/db")
 def debug_db():
@@ -98,7 +102,6 @@ def debug_db():
     if not dsn:
         return jsonify({"ok": False, "error": "DATABASE_URL no definida"}), 500
 
-    # no exposem password
     safe = dsn
     if "://" in safe and "@" in safe:
         prefix, rest = safe.split("://", 1)
@@ -106,11 +109,8 @@ def debug_db():
         user = creds.split(":", 1)[0]
         safe = f"{prefix}://{user}:***@{tail}"
 
-    return jsonify({
-        "ok": True,
-        "dsn_masked": safe
-    })
+    return jsonify({"ok": True, "dsn_masked": safe})
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, threaded=True)
