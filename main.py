@@ -28,16 +28,15 @@ from api.Controllers.Series.SerieGet import serie_get_bp
 from api.Controllers.Series.SerieCreate import serie_create_bp
 from api.Controllers.Series.SerieUpdate import serie_update_bp
 from api.Controllers.Series.SerieDelete import serie_delete_bp
-
-
+from api.Controllers.Favorites.FavoritesController import favorites_bp
 
 from sqlalchemy import text
 from api.Models.Base import engine, Base
-# Importar els models per a que SQLAlchemy els conegui al fer create_all
 from api.Models.User import User
 from api.Models.Peli import Peli
 from api.Models.Serie import Serie
 from api.Models.Video import Video
+from api.Models.Favorite import Favorite
 
 # Crear taules si no existeixen
 Base.metadata.create_all(bind=engine)
@@ -96,6 +95,7 @@ app.register_blueprint(serie_get_bp)
 app.register_blueprint(serie_create_bp)
 app.register_blueprint(serie_update_bp)
 app.register_blueprint(serie_delete_bp)
+app.register_blueprint(favorites_bp)
 
 
 @app.get("/api/_debug/db")
