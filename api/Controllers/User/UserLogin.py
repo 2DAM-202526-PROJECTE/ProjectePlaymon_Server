@@ -42,7 +42,7 @@ def login_user():
             "id": user.id,
             "username": user.username,
             "role": user.role,
-            "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
+            "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
         }
         token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
