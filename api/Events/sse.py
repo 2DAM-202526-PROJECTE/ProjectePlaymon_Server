@@ -1,5 +1,5 @@
 from flask import Blueprint, Response, stream_with_context
-from .sse_broker import subscribe, unsubscribe
+from .sse_broker import subscribe, unsubscribe, subscribe_notifications, unsubscribe_notifications
 
 sse_bp = Blueprint("sse", __name__)
 
@@ -23,6 +23,27 @@ def stream_users():
             yield from _generate(q)
         finally:
             unsubscribe(q)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@sse_bp.get("/api/stream/notifications")
+def stream_notifications():
+    q = subscribe_notifications()
+
+    def generate():
+        try:
+            yield from _generate(q)
+        finally:
+            unsubscribe_notifications(q)
 
     return Response(
         stream_with_context(generate()),

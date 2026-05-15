@@ -25,6 +25,11 @@ from api.Controllers.Series.SerieCreate import serie_create_bp
 from api.Controllers.Series.SerieUpdate import serie_update_bp
 from api.Controllers.Series.SerieDelete import serie_delete_bp
 
+from api.Controllers.Notifications.NotificationGet import notification_get_bp
+from api.Controllers.Notifications.NotificationCreate import notification_create_bp
+from api.Controllers.Notifications.NotificationRead import notification_read_bp
+from api.Controllers.Notifications.NotificationDelete import notification_delete_bp
+
 from api.Events.sse import sse_bp
 
 from sqlalchemy import text
@@ -33,6 +38,7 @@ from api.Models.User import User
 from api.Models.Peli import Peli
 from api.Models.Serie import Serie
 from api.Models.Video import Video
+from api.Models.Notification import Notification, NotificationRead
 
 Base.metadata.create_all(bind=engine)
 
@@ -58,6 +64,11 @@ app.register_blueprint(serie_get_bp)
 app.register_blueprint(serie_create_bp)
 app.register_blueprint(serie_update_bp)
 app.register_blueprint(serie_delete_bp)
+
+app.register_blueprint(notification_get_bp)
+app.register_blueprint(notification_create_bp)
+app.register_blueprint(notification_read_bp)
+app.register_blueprint(notification_delete_bp)
 
 app.register_blueprint(sse_bp)
 
